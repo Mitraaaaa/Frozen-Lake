@@ -10,11 +10,8 @@ from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 env = gym.make("FrozenLake-v1", desc=generate_random_map(size=4), render_mode="human", is_slippery=True)
 
 observation, info = env.reset(seed=42)
-state = env.reset()[0]
-# print(state)
-
+state_1 = env.reset()[0]
 max_iter_number = 1000
-# print(env.P)
 holes = []
 P_1 = {}
 for key1, value1 in env.P.items():
@@ -30,37 +27,28 @@ def initialize_prop():
             for action in range(env.action_space.n):
                 for next_sr_idx in range(len(P_1[state][action])):
                     if P_1[state][action][next_sr_idx][3] == False and P_1[state][action][next_sr_idx][2] == 0:
-                        P_1[state][action][next_sr_idx][2] = -0.01
+                        P_1[state][action][next_sr_idx][2] = -0.001
 
-def value_iteration(env, gamma = 1.0):
+def value_iteration(env, gamma):
     
-    value_table = np.zeros(env.observation_space.n)
-    
+    value_table = np.zeros(env.observation_space.n)  
     no_of_iterations = 100
-    threshold = 1e-20
-    
     for i in range(no_of_iterations):
-        updated_value_table = np.copy(value_table) 
         for state in range(env.observation_space.n):
             Q_value = []
             for action in range(env.action_space.n):
                 next_states_rewards = []
                 for next_sr in P_1[state][action]: 
-                    # print(next_sr)
                     trans_prob, next_state, reward_prob, _ = next_sr 
-                    next_states_rewards.append((trans_prob * (reward_prob + gamma * updated_value_table[next_state]))) 
-                
+                    next_states_rewards.append((trans_prob * (reward_prob + gamma * value_table[next_state]))) 
+    
                 Q_value.append(np.sum(next_states_rewards))
                 
             value_table[state] = max(Q_value) 
     
-        if (np.sum(np.fabs(updated_value_table - value_table)) <= threshold):
-             break
-    
     return value_table
 
-def extract_policy(value_table, gamma = 1.0):
-
+def extract_policy(value_table, gamma):
     policy = np.zeros(env.observation_space.n) 
     for state in range(env.observation_space.n):
         Q_table = np.zeros(env.action_space.n)
@@ -73,16 +61,10 @@ def extract_policy(value_table, gamma = 1.0):
         policy[state] = np.argmax(Q_table)
     return policy
 
-def is_in_range(x,y):
-    if x>=0 and x<env.observation_space.n and y>=0 and y < env.observation_space.n:
-        return True
-    else : return False
-
 def set_hole_value(new_hole_state : int):
     if len(holes)!=0 and new_hole_state in holes:
         return
     else :
-        holes.append(new_hole_state)
         for state in range(env.observation_space.n):
             if state == new_hole_state - 1 or state == new_hole_state + 1 \
                   or state == new_hole_state + sqrt(env.observation_space.n) or state == new_hole_state - sqrt(env.observation_space.n) :
@@ -92,34 +74,26 @@ def set_hole_value(new_hole_state : int):
                         if reward == 1 : 
                             return
                         if next_state == new_hole_state:
-                            print(new_hole_state)
-                            print(P_1[state][action][next_sr_idx])
-                            P_1[state][action][next_sr_idx][2] = -1 
-                            print(P_1[state][action][next_sr_idx])
+                            P_1[state][action][next_sr_idx][2] = -1
+        holes.append(new_hole_state)
                     
 initialize_prop()
 for _ in range(max_iter_number):
 
    ##################################
-
    # # TODO # #
-   optimal_value_function = value_iteration(env=env,gamma=1.0)
-
-   optimal_policy = extract_policy(optimal_value_function, gamma=1.0)
+   optimal_value_function = value_iteration(env=env,gamma=0.7)
+   optimal_policy = extract_policy(optimal_value_function, gamma=0.6)
    action = int(optimal_policy[observation])
-   env.step(action)
 
    observation, reward, terminated, truncated, info = env.step(action)
+
+   state_1 = observation
    if truncated:
       observation, info = env.reset()
 
    if terminated : 
       observation, info = env.reset()
-      set_hole_value(state)
-    #   print(P_1[state][action])
-    #   P[state][action][2]= -1
-    #   print("=================")
+      set_hole_value(state_1)
 
-   state = observation
-      
 env.close()
